@@ -1,0 +1,14 @@
+name: cadet-api
+channels:
+  - conda-forge
+dependencies:
+  - cadet
+  - uvicorn
+  - uv
+  - gunicorn
+  - pip
+  - dill
+  - fastapi
+  - python-dotenv
+  - pip:
+      - cadet-process

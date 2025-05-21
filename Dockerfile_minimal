@@ -1,0 +1,18 @@
+FROM condaforge/miniforge3 as conda
+#FROM mambaorg/micromamba as conda
+
+COPY environment.yml .
+RUN --mount=type=cache,target=/opt/conda/pkgs mamba create --copy -p /env --file environment.yml && echo 4
+COPY app /app
+#RUN /env/bin/python -m pip install --no-deps /app
+
+RUN /env/bin/python -m pip cache purge
+# --- Stage 2: Distroless runtime ---
+FROM gcr.io/distroless/python3-debian12
+
+# Copy env and app
+COPY --from=conda /env /env
+COPY --from=conda /app /app
+
+# only uvicorn
+CMD ["/env/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
