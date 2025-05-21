@@ -84,7 +84,7 @@ Check: 0.0.0.0:8000/docs
 
 You must create a `Process` class on the client side with a `simulate()` method, serialize it with `dill`, encode it with base64, and sign the payload with the shared secret.
 
-See [cadet-process config](https://github.com/your-org/cadet-process) for best practices.
+See [cadet-process LWE example](https://cadet-process.readthedocs.io/en/latest/examples/load_wash_elute/lwe_concentration.html) for best practices.
 
 ---
 
