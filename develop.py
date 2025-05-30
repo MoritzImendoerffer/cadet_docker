@@ -6,13 +6,13 @@ import hashlib
 import requests
 import numpy as np
 from dotenv import load_dotenv
-
+import json
 from CADETProcess.processModel import (
     ComponentSystem, StericMassAction,
     Inlet, GeneralRateModel, Outlet,
     FlowSheet, Process
 )
-from CADETProcess.simulator import CadetSimulator  # only used for local testing if needed
+from CADETProcess.dataStructure import Structure
 
 # Load shared secret
 load_dotenv()
@@ -76,6 +76,11 @@ process.add_event("load", "flow_sheet.inlet.c", c_load)
 process.add_event("wash", "flow_sheet.inlet.c", c_wash, time=load_duration)
 process.add_event("grad_start", "flow_sheet.inlet.c", c_gradient_poly, time=t_gradient_start)
 
+
+def save_dict(d, file_name="dict2json.json"):
+    with open(file_name, "w") as fp:
+        json.dump(d , fp) 
+        
 # SERIALIZE, ENCODE, SIGN
 proc_bytes = dill.dumps(process)
 proc_b64 = base64.b64encode(proc_bytes).decode("utf-8")
