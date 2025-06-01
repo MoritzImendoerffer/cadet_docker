@@ -1,58 +1,73 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Dict, Type
-
-# Import all schema classes
-from app.models.component import ComponentSystemParams
-from app.models.column import GeneralRateModelParams
-from app.models.binding import StericMassActionParams
-from app.models.flow import InletParams, OutletParams
-from app.models.flowsheet import FlowSheetParams
-from app.models.process import ProcessParams
-
-# Import CADet Process objects
 from CADETProcess.processModel import (
     ComponentSystem, StericMassAction,
-    Inlet, GeneralRateModel, Outlet,
+    Inlet, Outlet, GeneralRateModel,
     FlowSheet, Process
 )
 
-# FastAPI app
-app = FastAPI()
-
-# Mapping schema keys to schema classes and CADet model constructors
-schema_map: Dict[str, Type[BaseModel]] = {
-    "ComponentSystemParams": ComponentSystemParams,
-    "StericMassActionParams": StericMassActionParams,
-    "GeneralRateModelParams": GeneralRateModelParams,
-    "InletParams": InletParams,
-    "OutletParams": OutletParams,
-    "FlowSheetParams": FlowSheetParams,
-    "ProcessParams": ProcessParams
+# Register supported models
+binding_models = {
+    "SMA": StericMassAction
 }
 
+rate_models = {
+    "GeneralRateModel": GeneralRateModel
+}
 
-class CadetBuilder:
-    @staticmethod
-    def build(parsed: dict) -> Process:
-        # Instantiate components from parsed dict
-        system = ComponentSystem(**parsed["ComponentSystemParams"])
-        binding = StericMassAction(**parsed["StericMassActionParams"])
+unit_classes = {
+    "Inlet": Inlet,
+    "Outlet": Outlet
+}
 
-        # Build units
-        inlet = Inlet(**parsed["InletParams"])
-        column = GeneralRateModel(binding=binding, **parsed["GeneralRateModelParams"])
-        outlet = Outlet(**parsed["OutletParams"])
+def build_process(parsed: dict) -> Process:
+    # Build component system
+    cs = ComponentSystem()
+    for comp in parsed["ComponentSystemParams"]["components"]:
+        cs.add_component(comp)
 
-        # Assemble flowsheet
-        flowsheet_data = parsed["FlowSheetParams"]
-        units = {u.name: u for u in [inlet, column, outlet]}
-        flowsheet = FlowSheet(units=units, **flowsheet_data)
-        
-        # Final process
-        return Process(
-            system=system,
-            flowSheet=flowsheet,
-            **parsed["ProcessParams"]
+    # Build binding model
+    bp = parsed["BindingParams"]
+    binding_cls = binding_models.get(bp["type"])
+    if not binding_cls:
+        raise NotImplementedError(f"Unsupported binding model: {bp['type']}")
+    binding = binding_cls(cs, name=bp["name"])
+    binding.parameters = {k: bp[k] for k in binding.required_parameters}
+
+    # Build rate model (column)
+    rp = parsed["RateModelParams"]
+    column_name = rp["name"]
+    rate_cls = rate_models.get(column_name)
+    if not rate_cls:
+        raise NotImplementedError(f"Unsupported rate model: {column_name}")
+    column = rate_cls(cs, name=column_name)
+    column.parameters = {k: rp[k] for k in column.required_parameters}
+    column.binding = binding
+
+    # Build other units
+    inlet = Inlet(cs, **parsed["InletParams"])
+    outlet = Outlet(cs, **parsed["OutletParams"])
+
+    # Build flowsheet
+    fs = FlowSheet(cs)
+    unit_instances = {
+        inlet.name: inlet,
+        outlet.name: outlet,
+        column.name: column
+    }
+
+    for unit_def in parsed["FlowSheetParams"]["units"]:
+        unit = unit_instances[unit_def["name"]]
+        is_product = unit.name == parsed["FlowSheetParams"]["product_outlet"]
+        fs.add_unit(unit, product_outlet=is_product)
+
+    for conn in parsed["FlowSheetParams"]["connections"]:
+        fs.add_connection(
+            unit_instances[conn["from_unit"]],
+            unit_instances[conn["to_unit"]]
         )
 
+    # Build and return full process
+    return Process(
+        system=cs,
+        flowSheet=fs,
+        **parsed["ProcessParams"]
+    )

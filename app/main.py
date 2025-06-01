@@ -1,39 +1,18 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 from dotenv import load_dotenv
-from .models.process import ProcessParams
-from app.models.component import ComponentSystemParams
-from app.models.column import GeneralRateModelParams
-from app.models.binding import StericMassActionParams
-from app.models.flow import InletParams, OutletParams
-from app.models.flowsheet import FlowSheetParams
-from app.models.process import ProcessParams
-from .builder import CadetBuilder
+from app.models.models import (
+    ComponentSystemParams,
+    BindingParams,
+    RateModelParams,
+    InletParams,
+    OutletParams,
+    FlowSheetParams,
+    ProcessParams
+)
+from .builder import build_process
+
 load_dotenv()
-#SECRET = os.getenv("SHARED_SECRET", "changeme").encode()
-SECRET = "SUPERSECRET"
 app = FastAPI()
-
-# @app.post("/simulate")
-# async def simulate(request: Request):
-#     data = await request.json()
-#     proc_b64 = data.get("process")
-#     signature = data.get("signature")
-
-#     if not proc_b64 or not signature:
-#         raise HTTPException(status_code=400, detail="Missing process or signature")
-
-#     expected = hmac.new(SECRET, proc_b64.encode(), hashlib.sha256).hexdigest()
-#     if not hmac.compare_digest(expected, signature):
-#         raise HTTPException(status_code=403, detail="Invalid signature")
-
-#     process_bytes = base64.b64decode(proc_b64.encode())
-#     process = dill.loads(process_bytes)
-
-#     results = process.simulate()
-#     result_bytes = dill.dumps(results)
-#     result_b64 = base64.b64encode(result_bytes).decode()
-
-#     return {"result": result_b64}
 
 @app.post("/test")
 async def test(request: Request):
@@ -42,8 +21,8 @@ async def test(request: Request):
 @app.post("/simulate")
 def simulate(
     ComponentSystemParams: ComponentSystemParams,
-    StericMassActionParams: StericMassActionParams,
-    GeneralRateModelParams: GeneralRateModelParams,
+    BindingParams: BindingParams,
+    RateModelParams: RateModelParams,
     InletParams: InletParams,
     OutletParams: OutletParams,
     FlowSheetParams: FlowSheetParams,
@@ -51,14 +30,14 @@ def simulate(
 ):
     parsed = {
         "ComponentSystemParams": ComponentSystemParams.dict(),
-        "StericMassActionParams": StericMassActionParams.dict(),
-        "GeneralRateModelParams": GeneralRateModelParams.dict(),
+        "BindingParams": BindingParams.dict(),
+        "RateModelParams": RateModelParams.dict(),
         "InletParams": InletParams.dict(),
         "OutletParams": OutletParams.dict(),
         "FlowSheetParams": FlowSheetParams.dict(),
         "ProcessParams": ProcessParams.dict(),
     }
 
-    process = CadetBuilder.build(parsed)
-    # process.simulate()  # Optional: run simulation
+    process = build_process(parsed)
+    # process.simulate()  # Optional simulation step
     return {"message": "Process built successfully", "units": list(process.flowSheet.units.keys())}

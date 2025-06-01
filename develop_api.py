@@ -21,6 +21,7 @@ with open("lwe_1.json", "r") as f:
     parsed = json.load(f)
 
 
+# Registry of constructors
 binding_models = {
     "SMA": StericMassAction
 }
@@ -29,44 +30,64 @@ rate_models = {
     "GeneralRateModel": GeneralRateModel
 }
 
+unit_classes = {
+    "Inlet": Inlet,
+    "Outlet": Outlet,
+    **rate_models  # include all column models under their types
+}
 
-comps = parsed["ComponentSystemParams"]
+# Create component system
 cs = ComponentSystem()
-for comp in comps["components"]:
+for comp in parsed["ComponentSystemParams"]["components"]:
     cs.add_component(comp)
 
+# Build binding model
 bp = parsed["BindingParams"]
-binding_model = binding_models.get(bp["type"])
-if binding_model:
-    bm = binding_model(cs, name = bp["name"])
-    if all([p in bp.keys() for p in bm.required_parameters]):
-        bm.parameters = {key: bp[key] for key in bm.required_parameters}
-    else:
-        raise ValueError("Check your binding model parameters")       
-else:
-    raise NotImplementedError("Binding model not supported")
+binding_model_cls = binding_models.get(bp["type"])
+if not binding_model_cls:
+    raise NotImplementedError(f"Binding model '{bp['type']}' is not supported.")
+binding = binding_model_cls(cs, name=bp["name"])
+binding.parameters = {k: bp[k] for k in binding.required_parameters}
 
+# Build column (rate model)
+rp = parsed["RateModelParams"]
+rate_model_cls = rate_models.get(rp["name"])
+if not rate_model_cls:
+    raise NotImplementedError(f"Rate model '{rp['name']}' is not supported.")
+column = rate_model_cls(cs, name=rp["name"])
+column_params = {k: rp[k] for k in column.required_parameters}
+column.parameters = column_params
+column.binding = binding
 
+# Create other units (Inlet, Outlet)
 inlet = Inlet(cs, **parsed["InletParams"])
 outlet = Outlet(cs, **parsed["OutletParams"])
 
-rp = parsed["RateModelParams"]
-rate_model = rate_models.get(rp["type"])
-if rate_model:
-    column = rate_model(cs, name=rp["name"])
-    if all([p in rp.keys() for p in column.required_parameters]):
-        column.parameters = {key: rp[key] for key in column.required_parameters}
-else:
-    raise NotImplementedError("Rate model not supported")
-
-
-# Assemble flowsheet
+# Build flowsheet
 fs = FlowSheet(cs)
-# .... STUCK HERE ... 
-# How to achieve following code in a generic way from the jso
-#fs.add_unit(inlet)
-#fs.add_unit(column)
-#fs.add_unit(outlet, product_outlet=True)
-#fs.add_connection(inlet, column)
-#fs.add_connection(column, outlet)
-print("Done")
+unit_data = parsed["FlowSheetParams"]["units"]
+unit_instances = {}
+
+for u in unit_data:
+    name = u["name"]
+    utype = u["type"]
+
+    if utype not in unit_classes:
+        raise NotImplementedError(f"Unit type '{utype}' is not supported.")
+    
+    if utype == rp["type"]:  # Matches the one in RateModelParams
+        unit = column
+    elif utype == "Inlet":
+        unit = inlet
+    elif utype == "Outlet":
+        unit = outlet
+    else:
+        unit = unit_classes[utype](cs, name=name)
+
+    is_product = name == parsed["FlowSheetParams"].get("product_outlet")
+    fs.add_unit(unit, product_outlet=is_product)
+    unit_instances[name] = unit
+
+# Connect units
+for conn in parsed["FlowSheetParams"]["connections"]:
+    fs.add_connection(unit_instances[conn["from_unit"]], unit_instances[conn["to_unit"]])
