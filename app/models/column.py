@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Union, List
-from .binding import StericMassActionParams
+from typing import Literal, List
 
 class GeneralRateModelParams(BaseModel):
     """
@@ -15,8 +14,8 @@ class GeneralRateModelParams(BaseModel):
     particle_radius: float = Field(..., description="Radius of particles [m]")
     particle_porosity: float = Field(..., description="Particle porosity [-]")
 
-    axial_dispersion: float = Field(..., description="Axial dispersion coefficient [m²/s]")
+    axial_dispersion: float = Field(..., description="Axial dispersion coefficient [m2/s]")
     film_diffusion: float = Field(..., description="Film mass transfer coefficient [m/s]")
-    pore_diffusion: List[float] = Field(..., description="Intra-particle pore diffusivity per component [m²/s]")
-
-    binding: StericMassActionParams = Field(..., description="Binding model configuration (e.g., SMA)")
+    pore_diffusion: List[float] = Field(..., description="Intra-particle pore diffusivity per component [m2/s]")
+    surface_diffusion: List[float] = Field (..., description="Surface diffusion [m2/s]")
+    binding: BaseModel = Field(..., description="Binding model (provided by builder)")

@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
-import base64
-import dill
-import hmac
-import hashlib
-from .builder import build_process_from_params
 from .models.process import ProcessParams
-
+from app.models.component import ComponentSystemParams
+from app.models.column import GeneralRateModelParams
+from app.models.binding import StericMassActionParams
+from app.models.flow import InletParams, OutletParams
+from app.models.flowsheet import FlowSheetParams
+from app.models.process import ProcessParams
+from .builder import CadetBuilder
 load_dotenv()
 #SECRET = os.getenv("SHARED_SECRET", "changeme").encode()
 SECRET = "SUPERSECRET"
@@ -39,11 +40,25 @@ async def test(request: Request):
     return {"result": "Hurra"}
 
 @app.post("/simulate")
-def simulate(params: ProcessParams):
-    process = build_process_from_params(params)
-    result = process.simulate()
-
-    return {
-        "time": result.solution.column.outlet.time.tolist(),
-        "outlet_concentration": result.solution.column.outlet.solution.tolist()
+def simulate(
+    ComponentSystemParams: ComponentSystemParams,
+    StericMassActionParams: StericMassActionParams,
+    GeneralRateModelParams: GeneralRateModelParams,
+    InletParams: InletParams,
+    OutletParams: OutletParams,
+    FlowSheetParams: FlowSheetParams,
+    ProcessParams: ProcessParams
+):
+    parsed = {
+        "ComponentSystemParams": ComponentSystemParams.dict(),
+        "StericMassActionParams": StericMassActionParams.dict(),
+        "GeneralRateModelParams": GeneralRateModelParams.dict(),
+        "InletParams": InletParams.dict(),
+        "OutletParams": OutletParams.dict(),
+        "FlowSheetParams": FlowSheetParams.dict(),
+        "ProcessParams": ProcessParams.dict(),
     }
+
+    process = CadetBuilder.build(parsed)
+    # process.simulate()  # Optional: run simulation
+    return {"message": "Process built successfully", "units": list(process.flowSheet.units.keys())}
