@@ -10,3 +10,4 @@ class ProcessParams(BaseModel):
 
     load_duration: float
     t_gradient_start: float
+    

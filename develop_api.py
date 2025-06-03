@@ -9,6 +9,7 @@ from app.models.binding import StericMassActionParams
 from app.models.flow import InletParams, OutletParams
 from app.models.flowsheet import FlowSheetParams
 from app.models.process import ProcessParams
+from CADETProcess.simulator import Cadet
 
 # Import CADet Process objects
 from CADETProcess.processModel import (
