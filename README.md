@@ -1,116 +1,109 @@
-# 🧪 Simulation API
+# CADET Simulation Microservice
 
-This FastAPI application allows you to send serialized Python `Process` objects to a server for simulation and receive results in a secure and efficient manner. It is designed to be used with Docker and supports HMAC-based authentication to verify the integrity and authenticity of the requests.
+This project provides a FastAPI-based microservice that runs simulations using [CADETProcess](https://github.com/modsim/CADET) based on RSA-signed payloads. Clients submit dill-pickled `Process` objects signed with their private keys. The server verifies signatures, runs the simulation, and returns signed results.
 
----
-
-## 🚀 Features
-
-- Accepts serialized and signed `Process` objects.
-- Secure communication using HMAC-SHA256.
-- Supports custom simulation workflows via class-based architecture.
-- Lightweight test endpoint for health checks or dev integration.
+The clients public key should either reside in <root>/client_keys or in a folder defined by CLIENT_KEYS_DIR
 
 ---
 
-## 📦 API Endpoints
+## 📦 Features
 
-### `POST /simulate`
+- POST `/simulate`: Simulate a CADET `Process` instance
+- GET `/public_key`: Get the server’s public key
+- RSA-based signature verification
+- Supports end-to-end test suite with isolated keypairs
 
-**Description:** Accepts a base64-encoded and signed `Process` object, executes its `simulate()` method, and returns the results.
+---
 
-#### Request Body
+## 🛠 Requirements
+
+- Python 3.8+
+- Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 🚀 Running the Server
+
+By default, the server uses environment variables to configure keys:
+
+```bash
+export PRIVATE_KEY_PATH=private_key.pem
+export PUBLIC_KEY_PATH=public_key.pem
+export CLIENT_KEYS_DIR=client_keys
+```
+
+Start the server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+---
+
+## 🧪 Running Tests
+
+Tests are located in the `tests/` folder and use `pytest`.
+
+```bash
+# Run all tests
+pytest tests/
+```
+
+To enable test discovery in **VS Code**:
+- Press `Ctrl+Shift+P` → "Python: Configure Tests"
+- Choose `pytest`, then `tests` as the folder
+
+Ensure `.vscode/settings.json` contains:
 
 ```json
 {
-  "process": "<base64-encoded dill-serialized Process object>",
-  "signature": "<HMAC SHA256 signature>"
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"]
 }
 ```
 
-#### Response
+---
+
+## 🗝️ Client Integration
+
+Clients must:
+
+1. Serialize a `CADETProcess.Process` instance with `dill`
+2. Sign the serialized bytes using their private RSA key
+3. Send a POST to `/simulate` with:
+   - `client_id`: Matches a public key file in `client_keys/<client_id>.pem`
+   - `process_serialized`: Base64-encoded dill blob
+   - `signature`: Base64-encoded RSA signature
+
+Example payload:
 
 ```json
 {
-  "result": "<base64-encoded dill-serialized simulation result>"
+  "client_id": "acme",
+  "process_serialized": "<base64-dill>",
+  "signature": "<base64-signature>"
 }
 ```
 
 ---
 
-### `POST /test`
+## 📁 Project Structure
 
-**Description:** Simple test endpoint to verify server availability.
-
-#### Response
-
-```json
-{
-  "result": "Hurra"
-}
+```
+app/
+ ├── main.py          # FastAPI app
+ ├── utils.py         # Key handling and serialization
+client_keys/          # Public keys per client
+tests/
+ └── test_simulate.py # Tests for the /simulate endpoint
 ```
 
 ---
 
-## 🔐 Security
-
-The request is validated using an HMAC-SHA256 signature. The server calculates a hash from the payload using a shared secret and compares it to the provided signature to verify authenticity.
-
-```python
-expected = hmac.new(SECRET, proc_b64.encode(), hashlib.sha256).hexdigest()
-```
-
----
-
-## 🛠️ Setup
-
-### Requirements
-
-Requirements are defined in environment.yml
-
-### Install dependencies
-
-docker buildx build -t cadet-api-ubuntu --file Dockerfile_ubuntu .
-
-### Run the server
-
-
-docker run -d -p 8000:8000 cadet-api-ubuntu
-
-Check: 0.0.0.0:8000/docs
----
-
-## 📤 Sending a Process
-
-You must create a `Process` class on the client side with a `simulate()` method, serialize it with `dill`, encode it with base64, and sign the payload with the shared secret.
-
-See [cadet-process LWE example](https://cadet-process.readthedocs.io/en/latest/examples/load_wash_elute/lwe_concentration.html) for best practices.
-
----
-
-## 📌 TODO
-
-- [ ] Replace the hardcoded secret:
-
-    ```python
-    # Replace:
-    SECRET = "SUPERSECRET"
-
-    # With:
-    import os
-    SECRET = os.getenv("SHARED_SECRET", "changeme").encode()
-    ```
-
-- [ ] Use `.env` for configuration and secrets. 
-
-- [ ] Implement logging for better observability.
-
-- [ ] Add unit and integration tests.
-
-- [ ] Add client SDK or usage examples.
-
----
-
-## 📄 License
+## 📝 License
 
 GPL3

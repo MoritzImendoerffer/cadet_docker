@@ -82,7 +82,7 @@ proc_b64 = base64.b64encode(proc_bytes).decode("utf-8")
 sig = hmac.new(SECRET, proc_b64.encode("utf-8"), hashlib.sha256).hexdigest()
 
 # SEND REQUEST
-url = "http://localhost:8000/simulate"  # Change to Docker host if needed
+url = "http://localhost:8001/simulate"  # Change to Docker host if needed
 
 response = requests.post(url, json={
     "process": proc_b64,
