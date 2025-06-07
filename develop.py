@@ -12,7 +12,7 @@ from CADETProcess.processModel import (
     Inlet, GeneralRateModel, Outlet,
     FlowSheet, Process
 )
-from CADETProcess.dataStructure import Structure
+from CADETProcess.simulator import Cadet
 
 # Load shared secret
 load_dotenv()
@@ -38,7 +38,7 @@ inlet.flow_rate = 6.683738370512285e-8
 
 column = GeneralRateModel(cs, name="column")
 column.binding_model = sma
-column.length = 0.014
+column.length = 0.14
 column.diameter = 0.02
 column.bed_porosity = 0.37
 column.particle_radius = 4.5e-5
@@ -76,6 +76,8 @@ process.add_event("load", "flow_sheet.inlet.c", c_load)
 process.add_event("wash", "flow_sheet.inlet.c", c_wash, time=load_duration)
 process.add_event("grad_start", "flow_sheet.inlet.c", c_gradient_poly, time=t_gradient_start)
 
+cadet = Cadet()
+results = cadet.simulate(process)
 
 def save_dict(d, file_name="dict2json.json"):
     with open(file_name, "w") as fp:

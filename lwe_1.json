@@ -84,24 +84,25 @@
     },
     "ProcessParams": {
         "name": "lwe_1",
-        "cycle_time_cv": 20,
-        "load_volume_mL": 200,
-        "flow_rate_ml_min": 15,
-        "wash_duration_cv": 4,
-        "gradient_duration_cv": 3,
-        "c_load": [
+        "cycle_time|cv": 20,
+        "load_volume|ml": 200,
+        "flow_rate|ml_min": 15,
+        "equil_duration|cv": 3,
+        "wash_duration|cv": 4,
+        "gradient_duration|cv": 3,
+        "c_load|mM": [
             50.0,
             1.0,
             1.0,
             1.0
         ],
-        "c_wash": [
+        "c_wash|mM": [
             50.0,
             0.0,
             0.0,
             0.0
         ],
-        "c_elute": [
+        "c_elute|mM": [
             500.0,
             0.0,
             0.0,
