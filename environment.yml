@@ -11,7 +11,7 @@ dependencies:
   - fastapi
   - python-dotenv
   - requests
-  - dill
-  
+  - cryptography
+  - pytest
   - pip:
       - cadet-process

@@ -1,109 +1,105 @@
-# CADET Simulation Microservice
+## README.md
 
-This project provides a FastAPI-based microservice that runs simulations using [CADETProcess](https://github.com/modsim/CADET) based on RSA-signed payloads. Clients submit dill-pickled `Process` objects signed with their private keys. The server verifies signatures, runs the simulation, and returns signed results.
+# Cadet API 🍃 — Chromatography simulations as a service
 
-The clients public key should either reside in <root>/client_keys or in a folder defined by CLIENT_KEYS_DIR
+Cadet API wraps the [CADET](https://cadeploy.readthedocs.io/) process‑model
+tool-chain behind a HTTPS + JWT‑signed REST interface.
+It lets you submit a *dill‑serialised* `CADETProcess.Process`, runs the
+simulation in an isolated worker, and streams the results back—digitally
+signed so the client can verify integrity.
+
+The clients public key must be registered in the app. Refer to the [Instruction](INSTRUCTIONS.md) for more details.
+Pickling and unpicling is secured via private/public key pairs on the server and client side.
+
+
+| Endpoint      | Method | Purpose                                                          |
+| ------------- | ------ | ---------------------------------------------------------------- |
+| `/public_key` | GET    | Fetch the server’s signing public key                            |
+| `/simulate`   | POST   | Submit a base64‑encoded `process_serialized` payload + signature |
 
 ---
 
-## 📦 Features
-
-- POST `/simulate`: Simulate a CADET `Process` instance
-- GET `/public_key`: Get the server’s public key
-- RSA-based signature verification
-- Supports end-to-end test suite with isolated keypairs
-
----
-
-## 🛠 Requirements
-
-- Python 3.8+
-- Install dependencies:
+## Quick‑start (Docker)
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/<you>/cadet_docker.git
+cd cadet_docker
+
+# one command does *everything*
+./dev_setup.sh          # generates keys, builds the image, runs docker‑compose
 ```
+
+Open **[https://localhost:8001/docs](https://localhost:8001/docs)** for the interactive Swagger UI.
+
+> *First run note:* the Conda layer with CADET is large—expect a few minutes.
+
+### Requirements
+
+* Docker 20.10+ & Docker Compose v2 (Docker Desktop macOS/Windows or native packages Linux)
+* GNU make — optional, but handy.
 
 ---
 
-## 🚀 Running the Server
-
-By default, the server uses environment variables to configure keys:
+## Manual (Python‑only) development
 
 ```bash
-export PRIVATE_KEY_PATH=private_key.pem
-export PUBLIC_KEY_PATH=public_key.pem
-export CLIENT_KEYS_DIR=client_keys
+conda env create -f environment.yml
+conda activate cadet
+pytest              # run the unit tests
 ```
 
-Start the server:
-
-```bash
-uvicorn app.main:app --reload
-```
+The tests spin up Uvicorn on random localhost ports and exercise the full
+signature + simulation pipeline. No Docker needed.
 
 ---
 
-## 🧪 Running Tests
-
-Tests are located in the `tests/` folder and use `pytest`.
-
-```bash
-# Run all tests
-pytest tests/
-```
-
-To enable test discovery in **VS Code**:
-- Press `Ctrl+Shift+P` → "Python: Configure Tests"
-- Choose `pytest`, then `tests` as the folder
-
-Ensure `.vscode/settings.json` contains:
-
-```json
-{
-  "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["tests"]
-}
-```
-
----
-
-## 🗝️ Client Integration
-
-Clients must:
-
-1. Serialize a `CADETProcess.Process` instance with `dill`
-2. Sign the serialized bytes using their private RSA key
-3. Send a POST to `/simulate` with:
-   - `client_id`: Matches a public key file in `client_keys/<client_id>.pem`
-   - `process_serialized`: Base64-encoded dill blob
-   - `signature`: Base64-encoded RSA signature
-
-Example payload:
-
-```json
-{
-  "client_id": "acme",
-  "process_serialized": "<base64-dill>",
-  "signature": "<base64-signature>"
-}
-```
-
----
-
-## 📁 Project Structure
+## Directory layout
 
 ```
-app/
- ├── main.py          # FastAPI app
- ├── utils.py         # Key handling and serialization
-client_keys/          # Public keys per client
+app/                FastAPI package  ← imported as `app.*`
+  ├─ main.py        – HTTP endpoints
+  ├─ utils.py       – crypto & (de)serialisation helpers
+  └─ …              – extras
+scripts/
+  └─ generate_server_keys.py
+dev_setup.py        – guarantees ~/.cadet_api/ keystore + self‑signed TLS
+dev_setup.sh        – runs ↑ then `docker compose up`
+docker-compose_ubuntu.yml
+Dockerfile_ubuntu
 tests/
- └── test_simulate.py # Tests for the /simulate endpoint
 ```
 
 ---
 
-## 📝 License
+## Key & certificate model
+
+```
+~/.cadet_api/
+  private_key.pem             (server signing key)
+  public_key.pem              (matching public key, exposed at /public_key)
+  tls/
+      server.key              (TLS private key, self‑signed for dev)
+      server.crt
+  client_keys/
+      <client_id>.pem         (public key per authorised client)
+```
+
+`dev_setup.py` builds that tree automatically; override with
+`export CADET_KEY_HOME=/path/to/keys` if you prefer another location.
+
+---
+
+## Contributing
+
+1. Fork → feature branch → PR.
+2. Run `black`, `ruff`, and `pytest`.
+3. Explain **why** the change matters (performance, new model, …).
+
+We follow semantic‑commit prefixes (`feat:`, `fix:`, `docs:` …).
+
+---
+
+## License
 
 GPL3
+

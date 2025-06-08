@@ -1,13 +1,16 @@
-FROM condaforge/miniforge3 as conda
-#FROM mambaorg/micromamba as conda
+FROM condaforge/miniforge3 AS conda
 
 COPY environment.yml .
 COPY conda-lock.yml .
-RUN --mount=type=cache,target=/opt/conda/pkgs mamba create --copy -p /env --file environment.yml && echo 4
-COPY app /app
-#RUN /env/bin/python -m pip install --no-deps /app
 
-RUN /env/bin/python -m pip cache purge
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    mamba create --copy -p /env --file environment.yml
 
-# only uvicorn
-CMD ["/env/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY app /code/app
+WORKDIR /code
+
+RUN /env/bin/python -m pip cache purge || true
+
+EXPOSE 8001
+
+CMD ["/env/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

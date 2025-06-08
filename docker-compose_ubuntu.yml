@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  api:
+    image: cadet-api:dev
+    build: 
+      context: .
+      dockerfile: Dockerfile_ubuntu
+    env_file: .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./certs:/certs:ro
+      - ./app:/app
+      - ~/.cadet_api/client_keys:/code/client_keys:ro
+    environment:
+      DEVELOP: "${DEVELOP}"
+      PRIVATE_KEY_PEM: "${PRIVATE_KEY_PEM}"
+      PUBLIC_KEY_PEM: "${PUBLIC_KEY_PEM}"
+      CLIENT_KEYS_DIR: "/code/client_keys"
+    command: >
+      /env/bin/gunicorn app.main:app
+      -k uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8001
+      --workers 2
+      --keyfile /certs/privkey.pem
+      --certfile /certs/fullchain.pem

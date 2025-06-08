@@ -11,8 +11,11 @@ import requests
 import dill
 import sys, pathlib
 import socket
+from cryptography.hazmat.primitives import serialization
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1])) 
+
+from scripts.generate_server_keys import create_server_keys
 
 from app.utils import (
     load_private_key,
@@ -23,15 +26,31 @@ from app.utils import (
 )
 
 def _start_uvicorn(port: int):
-    env = os.environ.copy()
-    # ensure fresh keypair in temp dir so tests are hermetic
+    # Create a temporary directory for isolated keys
     tmpdir = tempfile.TemporaryDirectory()
-    env["PRIVATE_KEY_PATH"] = str(Path(tmpdir.name, "server_priv.pem"))
-    env["PUBLIC_KEY_PATH"]  = str(Path(tmpdir.name, "server_pub.pem"))
-    env["CLIENT_KEYS_DIR"]  = str(Path(tmpdir.name, "client_keys"))
-    Path(env["CLIENT_KEYS_DIR"]).mkdir()
+    tmp_path = Path(tmpdir.name)
 
-    #  launch
+    # Prepare env vars for the subprocess
+    env = os.environ.copy()
+
+    # Create server keys (private/public + client_keys dir)
+    create_server_keys(
+        env_file=None,
+        key_dir=tmp_path,
+        overwrite=True
+    )
+
+    # Load PEM content into env variables
+    priv_path = tmp_path / "private_key.pem"
+    pub_path = tmp_path / "public_key.pem"
+    client_keys_dir = tmp_path / "client_keys"
+    
+    client_keys_dir.mkdir(parents=True, exist_ok=True)
+    env["PRIVATE_KEY_PEM"] = priv_path.read_text()
+    env["PUBLIC_KEY_PEM"] = pub_path.read_text()
+    env["CLIENT_KEYS_DIR"] = str(client_keys_dir)
+
+    # Start Uvicorn server
     p = subprocess.Popen(
         ["python", "-m", "uvicorn", "app.main:app", "--port", str(port)],
         env=env,
@@ -39,6 +58,7 @@ def _start_uvicorn(port: int):
         stderr=subprocess.PIPE,
     )
 
+    # Wait for server to start (max 15 seconds)
     for _ in range(30):
         try:
             r = requests.get(f"http://localhost:{port}/public_key", timeout=3)
@@ -46,7 +66,11 @@ def _start_uvicorn(port: int):
                 return p, env, tmpdir
         except Exception:
             time.sleep(0.5)
-    raise RuntimeError("uvicorn failed to start")
+
+    # If server fails to start, capture logs and raise error
+    out, err = p.communicate()
+    raise RuntimeError(f"uvicorn failed to start:\nstdout:\n{out.decode()}\nstderr:\n{err.decode()}")
+
 
 def _make_process():
     """
@@ -149,7 +173,7 @@ def test_simulate():
         assert resp.ok, resp.text
 
         data = resp.json()
-        server_pub = load_public_key(env["PUBLIC_KEY_PATH"])
+        server_pub = serialization.load_pem_public_key(env["PUBLIC_KEY_PEM"].encode())
         assert verify_bytes(base64.b64decode(data["results_serialized"]),
                             data["signature"], server_pub)
 
@@ -210,3 +234,6 @@ def test_deserialization_error():
         server_proc.send_signal(signal.SIGINT)
         server_proc.wait(timeout=10)
         tmpdir.cleanup()
+        
+if __name__ == "__main__":
+    test_simulate()
