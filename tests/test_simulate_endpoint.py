@@ -5,8 +5,6 @@ import pytest
 import requests
 from cryptography.hazmat.primitives import serialization
 
-from .cadet_utils import make_process
-
 # make repo root importable
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from app.crypto import generate_rsa_keypair, sign_bytes, verify_bytes
@@ -16,7 +14,7 @@ from app.settings import (
     PUBLIC_KEY_CLIENT_ENV_PREFIX,
 )
 from app.serialization import loads_b64
-
+from tests.cadet_utils import make_process
 
 def _start_uvicorn(port: int, extra_env: dict[str, str]):
     env = os.environ.copy()

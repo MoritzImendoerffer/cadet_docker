@@ -1,14 +1,21 @@
-secrets:
-  private_key_server:
-    file: ./secrets/private_key_server.pem
-  public_key_server:
-    file: ./secrets/public_key_server.pem
-  public_key_client_acme:
-    file: ./secrets/public_key_client_acme.pem
-
+version: '3.8'
 services:
-  api:
+  cadet-api:
+    image: cadet-api
+    build:
+      context: .
+      dockerfile: Dockerfile_ubuntu
+    ports:
+    - 8001:8001
     secrets:
-      - private_key_server
-      - public_key_server
-      - public_key_client_acme
+    - private_key_server.pem
+    - public_key_server.pem
+    - public_key_client_acme.pem
+    env_file: docker.env
+secrets:
+  private_key_server.pem:
+    file: run/secrets/private_key_server.pem
+  public_key_server.pem:
+    file: run/secrets/public_key_server.pem
+  public_key_client_acme.pem:
+    file: run/secrets/public_key_client_acme.pem

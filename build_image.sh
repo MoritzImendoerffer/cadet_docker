@@ -16,5 +16,4 @@ fi
 echo "Building Docker images using $COMPOSE_FILE..."
 
 docker-compose -f "$COMPOSE_FILE" build
-
-echo "✅ Build complete."
+echo "Build complete."
