@@ -59,7 +59,7 @@ command: >
 
 * Tests live in `tests/` and use **pytest**.
 * Each test grabs a free port, writes keys to a temp-dir, and starts Uvicorn.
-* Helpers: `load_private_key`, `sign_bytes` in `app.utils`.
+* Helpers: `load_private_pem`, `sign_bytes` in `app.utils`.
 
 Speed tip: wrap server start‑up in a `@pytest.fixture(scope="module")` when adding many tests.
 

@@ -1,0 +1,14 @@
+secrets:
+  private_key_server:
+    file: ./secrets/private_key_server.pem
+  public_key_server:
+    file: ./secrets/public_key_server.pem
+  public_key_client_acme:
+    file: ./secrets/public_key_client_acme.pem
+
+services:
+  api:
+    secrets:
+      - private_key_server
+      - public_key_server
+      - public_key_client_acme
