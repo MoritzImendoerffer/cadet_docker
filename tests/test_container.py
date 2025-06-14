@@ -1,104 +1,119 @@
-# tests/test_container.py
+# tests/test_simulate_compose.py
 """
-End-to-end test that spins up the *built* Docker container.
+End-to-end test that starts the Cadet API stack with *docker compose up*
+(using the repo’s docker-compose.yml) and checks /simulate.
 """
 
+from __future__ import annotations
+
 import base64
-import socket
-import tempfile
-import time
-import pathlib
+import subprocess
 import sys
+import time
+from pathlib import Path
+
 import dill
 import pytest
 import requests
 from cryptography.hazmat.primitives import serialization
-from docker import from_env as docker_from_env
-from docker.errors import DockerException
 
-# required to import app.crypto
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
-from app.crypto import generate_rsa_keypair, sign_bytes, verify_bytes
-from docker_utils import build_cadet_image, DEFAULT_TAG as IMAGE_TAG
+# add repo root to PYTHONPATH for `app.crypto` & helpers
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from cadet_utils import make_process
+from app.crypto import sign_bytes, verify_bytes
+from tests.cadet_utils import make_process
 
+
+# --------------------------------------------------------------------------- #
+# Configuration – adjust only if your file names differ
+# --------------------------------------------------------------------------- #
+REPO_ROOT          = Path(__file__).resolve().parents[1]
+COMPOSE_FILE       = REPO_ROOT / "docker-compose.yml"
+SERVER_PUB_KEY     = REPO_ROOT / "run" / "secrets" / "public_key_server.pem"
+CLIENT_PRIV_KEY    = REPO_ROOT / "run" / "secrets" / "private_key_client_acme.pem"
+HOST_PORT          = 8001               # docker-compose.yml maps 8001:8001
+
+# --------------------------------------------------------------------------- #
+# Skip if docker compose is missing
+# --------------------------------------------------------------------------- #
 try:
-    _docker = docker_from_env()
-    _docker.ping()
-except DockerException:
-    pytest.skip("Docker daemon not available – skipping container test", allow_module_level=True)
+    subprocess.run(["docker", "compose", "version"],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+except (FileNotFoundError, subprocess.CalledProcessError):
+    pytest.skip("docker compose not available – skipping compose test",
+                allow_module_level=True)
 
 
-@pytest.fixture(scope="session")
-def docker_image():
-    """Build the image once per test session (or reuse if it exists)."""
-    return build_cadet_image()
+# --------------------------------------------------------------------------- #
+def _compose(cmd: list[str]) -> None:
+    """Run a docker-compose command and raise on error."""
+    subprocess.run(["docker", "compose", "-f", str(COMPOSE_FILE), *cmd],
+                   check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-def _host_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))
-        return s.getsockname()[1]
 
-def test_container(docker_image):
+@pytest.fixture(scope="module")
+def stack():
+    """Bring the stack up for a single test module, tear it down afterwards."""
+    _compose(["up", "-d", "--quiet-pull"])
+    try:
+        yield
+    finally:
+        # down even if the test failed
+        _compose(["down", "-v", "--remove-orphans"])
 
-    tmp = tempfile.TemporaryDirectory()
-    secrets_dir = pathlib.Path(tmp.name)
 
-    pub_pem, priv_pem, _ = generate_rsa_keypair()
-    secrets_dir.joinpath("public_key.pem").write_text(pub_pem)
-    secrets_dir.joinpath("private_key.pem").write_text(priv_pem)
-    
+# --------------------------------------------------------------------------- #
+def test_simulate_compose(stack):
+    # -------------------------------------------------------------------- #
+    # Wait until /public_key answers (max ≈15 s)
+    # -------------------------------------------------------------------- #
+    for _ in range(30):
+        try:
+            resp = requests.get(f"http:///0.0.0.0:{HOST_PORT}/public_key", timeout=2)
+            if resp.ok:
+                break
+        except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout):
+            pass
+        time.sleep(0.5)
+    else:
+        pytest.fail("Container never answered /public_key")
 
-    client_pub, client_priv_pem, _ = generate_rsa_keypair()
-    secrets_dir.joinpath("client_key_acme").write_text(client_pub)
-    client_priv = serialization.load_pem_private_key(client_priv_pem.encode(), password=None)
-
-    # Run container
-    port = _host_port()
-    container = _docker.containers.run(
-        IMAGE_TAG,
-        detach=True,
-        ports={"8001/tcp": port},
-        volumes={secrets_dir.as_posix(): {"bind": "/run/secrets", "mode": "ro"}},
+    # -------------------------------------------------------------------- #
+    # Prepare keys
+    # -------------------------------------------------------------------- #
+    server_pub = serialization.load_pem_public_key(SERVER_PUB_KEY.read_bytes())
+    client_priv = serialization.load_pem_private_key(
+        CLIENT_PRIV_KEY.read_bytes(), password=None
     )
 
-    try:
-        for _ in range(30):
-            try:
-                if requests.get(f"http://localhost:{port}/public_key", timeout=3).ok:
-                    break
-            except Exception:
-                time.sleep(0.5)
-        else:
-            pytest.fail("Container never answered /public_key")
+    # -------------------------------------------------------------------- #
+    # Build a dummy process & hit /simulate
+    # -------------------------------------------------------------------- #
+    proc_obj = make_process()
+    blob = dill.dumps(proc_obj)
 
-        proc = make_process()
-        proc_blob = dill.dumps(proc)
-        resp = requests.post(
-            f"http://localhost:{port}/simulate",
-            json={
-                "client_id": "acme",
-                "process_serialized": base64.b64encode(proc_blob).decode(),
-                "signature": sign_bytes(proc_blob, client_priv),
-            },
-            timeout=300,
-        )
-        assert resp.ok, resp.text
-        data = resp.json()
+    response = requests.post(
+        f"http://0.0.0.0:{HOST_PORT}/simulate",
+        json={
+            "client_id": "acme",
+            "process_serialized": base64.b64encode(blob).decode(),
+            "signature": sign_bytes(blob, client_priv),
+        },
+        timeout=300,
+    )
+    assert response.ok, response.text
+    payload = response.json()
 
-        server_pub = serialization.load_pem_public_key(pub_pem.encode())
-        assert verify_bytes(
-            base64.b64decode(data["results_serialized"]),
-            data["signature"],
-            server_pub,
-        )
-        results = dill.loads(base64.b64decode(data["results_serialized"]))
-        assert hasattr(results, "solution")
+    # verify server signature
+    assert verify_bytes(
+        base64.b64decode(payload["results_serialized"]),
+        payload["signature"],
+        server_pub,
+    )
 
-    finally:
-        container.remove(force=True, v=True)
-        tmp.cleanup()
+    # unpickle results & quick sanity check
+    results = dill.loads(base64.b64decode(payload["results_serialized"]))
+    assert hasattr(results, "solution")
 
 if __name__ == "__main__":
-    test_container(build_cadet_image())
+    test_simulate_compose(None)
