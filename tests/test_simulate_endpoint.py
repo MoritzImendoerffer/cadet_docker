@@ -22,6 +22,9 @@ from tests.cadet_utils import make_process
 def _start_uvicorn(port: int, extra_env: dict[str, str]):
     env = os.environ.copy()
 
+    # Set TEST_MODE to indicate we're in test environment
+    env["TEST_MODE"] = "1"
+    
     # Generate server keys
     pub_pem, priv_pem, _ = generate_rsa_keypair()
     env["PRIVATE_KEY_SERVER"] = priv_pem
@@ -39,7 +42,7 @@ def _start_uvicorn(port: int, extra_env: dict[str, str]):
     for _ in range(30):
         try:
             if requests.get(f"http://localhost:{port}/public_key", timeout=3).ok:
-                return proc, env
+                return proc
         except Exception:
             time.sleep(0.5)
 
@@ -63,8 +66,15 @@ def test_simulate():
     extra_env, client_priv_pem = _gen_client_env()
     client_priv = serialization.load_pem_private_key(client_priv_pem.encode(), None)
 
-    proc, env = _start_uvicorn(port, extra_env)
+    proc = _start_uvicorn(port, extra_env)
     try:
+        # Fetch the server's actual public key
+        key_resp = requests.get(f"http://localhost:{port}/public_key")
+        assert key_resp.ok
+        server_pub_pem = key_resp.json()["public_key"]
+        server_pub = serialization.load_pem_public_key(server_pub_pem.encode())
+        
+        # Create and simulate process
         proc_obj = make_process()
         blob = dill.dumps(proc_obj)
         resp = requests.post(
@@ -79,11 +89,11 @@ def test_simulate():
         assert resp.ok, resp.text
         data = resp.json()
 
-        server_pub = serialization.load_pem_public_key(
-            env["PUBLIC_KEY_SERVER"].encode()
-        )
+        # Verify the server's signature using the fetched public key
         assert verify_bytes(
-            base64.b64decode(data["results_serialized"]), data["signature"], server_pub
+            base64.b64decode(data["results_serialized"]), 
+            data["signature"], 
+            server_pub
         )
     finally:
         proc.send_signal(signal.SIGINT)
@@ -93,7 +103,7 @@ def test_simulate():
 def test_invalid_signature_rejected():
     port = _free_port()
     extra_env, client_priv_pem = _gen_client_env()
-    proc, env = _start_uvicorn(port, extra_env)
+    proc = _start_uvicorn(port, extra_env)
 
     try:
         process = make_process()
@@ -123,7 +133,7 @@ def test_deserialization_error():
     extra_env, client_priv_pem = _gen_client_env()
     client_priv = serialization.load_pem_private_key(client_priv_pem.encode(), None)
 
-    proc, env = _start_uvicorn(port, extra_env)
+    proc = _start_uvicorn(port, extra_env)
 
     try:
         bad_data = b"this is not a dill object"

@@ -9,10 +9,20 @@ PUBLIC_KEY_SERVER_FILE = "public_key_server.pem"
 PUBLIC_KEY_CLIENT_FILE_PREFIX = "public_key_client_"
 
 # Default secrets directory
-SECRETS_DIR = Path("./run/secrets")
+DEFAULT_SECRETS_DIR = Path("./run/secrets")
 
-if os.getenv("DOCKER_SECRETS") == "1":
-    SECRETS_DIR = Path("/run/secrets")
+# Determine secrets directory based on environment
+def get_secrets_dir() -> Path:
+    # Allow custom secrets directory via environment variable
+    if custom_dir := os.getenv("SECRETS_DIR"):
+        return Path(custom_dir)
+    
+    # Use Docker secrets directory if DOCKER_SECRETS is set
+    if os.getenv("DOCKER_SECRETS") == "1":
+        return Path("/run/secrets")
+    
+    # Default to local run/secrets
+    return DEFAULT_SECRETS_DIR
 
 
 class SecretsSettings:
@@ -35,10 +45,11 @@ class SecretsSettings:
     
     def __init__(
         self,
-        secrets_dir: Path = SECRETS_DIR,
+        secrets_dir: Path = None,
         env_fallback: bool = True,
     ):
-        self.secrets_dir = secrets_dir
+        # Use provided directory or determine from environment
+        self.secrets_dir = secrets_dir or get_secrets_dir()
         self.env_fallback = env_fallback
         self.client_file_prefix = PUBLIC_KEY_CLIENT_FILE_PREFIX
         self.client_keys: Dict[str, str] = {}
