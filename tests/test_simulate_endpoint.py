@@ -9,9 +9,9 @@ from cryptography.hazmat.primitives import serialization
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from app.crypto import generate_rsa_keypair, sign_bytes, verify_bytes
 from app.settings import (
-    PRIVATE_KEY_SERVER_ENV,
-    PUBLIC_KEY_SERVER_ENV,
-    PUBLIC_KEY_CLIENT_ENV_PREFIX,
+    PRIVATE_KEY_SERVER_FILE,
+    PUBLIC_KEY_SERVER_FILE,
+    PUBLIC_KEY_CLIENT_FILE_PREFIX,
 )
 from app.serialization import loads_b64
 from tests.cadet_utils import make_process
@@ -20,8 +20,8 @@ def _start_uvicorn(port: int, extra_env: dict[str, str]):
     env = os.environ.copy()
 
     pub_pem, priv_pem, _ = generate_rsa_keypair()
-    env[PRIVATE_KEY_SERVER_ENV] = priv_pem
-    env[PUBLIC_KEY_SERVER_ENV]  = pub_pem
+    env[PRIVATE_KEY_SERVER_FILE] = priv_pem
+    env[PUBLIC_KEY_SERVER_FILE]  = pub_pem
     env.update(extra_env)
 
     proc = subprocess.Popen(
@@ -48,7 +48,7 @@ def _free_port() -> int:
 
 def _gen_client_env():
     pub, priv, _ = generate_rsa_keypair()
-    return {f"{PUBLIC_KEY_CLIENT_ENV_PREFIX}acme": pub}, priv
+    return {f"{PUBLIC_KEY_CLIENT_FILE_PREFIX}acme": pub}, priv
 
 
 def test_simulate():
@@ -71,7 +71,7 @@ def test_simulate():
         assert resp.ok, resp.text
         data = resp.json()
 
-        server_pub = serialization.load_pem_public_key(env[PUBLIC_KEY_SERVER_ENV].encode())
+        server_pub = serialization.load_pem_public_key(env[PUBLIC_KEY_SERVER_FILE].encode())
         assert verify_bytes(base64.b64decode(data["results_serialized"]),
                             data["signature"], server_pub)
     finally:
