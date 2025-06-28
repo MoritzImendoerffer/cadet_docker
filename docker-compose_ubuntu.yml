@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  cadet-api:
+    image: cadet-api:ubuntu
+    build:
+      context: .
+      dockerfile: Dockerfile_ubuntu
+    ports:
+    - 8001:8001
+    secrets:
+    - private_key_server.pem
+    - public_key_server.pem
+    - public_key_client_acme.pem
+    env_file: docker.env
+secrets:
+  private_key_server.pem:
+    file: run/secrets/private_key_server.pem
+  public_key_server.pem:
+    file: run/secrets/public_key_server.pem
+  public_key_client_acme.pem:
+    file: run/secrets/public_key_client_acme.pem

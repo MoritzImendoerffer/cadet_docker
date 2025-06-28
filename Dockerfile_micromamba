@@ -1,15 +1,17 @@
-FROM continuumio/miniconda3:latest as builder
+FROM mambaorg/micromamba:2.3.0
 
 COPY environment.yml .
-COPY conda-lock.yml .
-COPY conda-linux-64.lock .
+
+# lock file created with "conda lock --kind explicit -p linux-64 -f environment.yml"
+COPY --chown=$MAMBA_USER:$MAMBA_USER -linux-64.lock .
+
+# lock file created with "conda lock -p linux-64 -f environment.yml"
+COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml .
 
 RUN --mount=type=cache,target=/opt/conda/pkgs \
-    conda create --copy -p /env --file conda-linux-64.lock && conda clean --all --yes
+    micromamba install -y -n base -p /env --file conda-lock.yml && micromamba clean --all --yes
 
-# Ensure CADET binaries are available and test installation
-RUN /env/bin/conda list cadet && \
-    ls -la /env/bin/cadet* || echo "CADET binaries not found in /env/bin"
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 COPY app /code/app
 WORKDIR /code
