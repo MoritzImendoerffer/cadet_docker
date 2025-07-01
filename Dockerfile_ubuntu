@@ -1,7 +1,6 @@
 FROM condaforge/miniforge3 AS conda
 
 COPY environment.yml .
-COPY conda-lock.yml .
 
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     mamba create --copy -p /env --file environment.yml && mamba clean --all --yes

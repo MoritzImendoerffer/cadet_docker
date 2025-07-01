@@ -1,29 +1,39 @@
-FROM continuumio/miniconda3:latest as builder
+# ----------------- 
+# Builder stage
+# ----------------- 
+FROM condaforge/miniforge3 AS builder
 
 COPY environment.yml .
-COPY conda-lock.yml .
-COPY conda-linux-64.lock .
 
 RUN --mount=type=cache,target=/opt/conda/pkgs \
-    conda create --copy -p /env --file conda-linux-64.lock && conda clean --all --yes
+    mamba create --copy -p /env --file environment.yml && \
+    mamba clean --all --yes
 
-# Ensure CADET binaries are available and test installation
-RUN /env/bin/conda list cadet && \
-    ls -la /env/bin/cadet* || echo "CADET binaries not found in /env/bin"
+# Verify CADET works
+RUN /env/bin/python -c "from CADETProcess.simulator import Cadet; print('CADET OK in builder')"
 
+# ----------------- 
+# Runtime stage - TRULY MINIMAL
+# ----------------- 
+FROM python:3.13-slim-bookworm
+
+# Copy the self-contained conda environment
+COPY --from=builder /env /env
+
+# Copy application
 COPY app /code/app
 WORKDIR /code
 
-RUN /env/bin/python -m pip cache purge || true
-
-# Set all conda environment variables (mimics conda activate)
+# Set environment variables
 ENV PATH="/env/bin:$PATH"
 ENV LD_LIBRARY_PATH="/env/lib:$LD_LIBRARY_PATH"
 ENV CONDA_PREFIX="/env"
 ENV CONDA_DEFAULT_ENV="cadet-api"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Ensure CADET can be found
-RUN /env/bin/python -c "from CADETProcess.simulator import Cadet; print('CADET import successful')" || echo "CADET import failed"
+# Verify CADET works
+RUN /env/bin/python -c "from CADETProcess.simulator import Cadet; print('CADET works in minimal image!')"
 
 EXPOSE 8001
 
