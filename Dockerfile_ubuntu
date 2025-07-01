@@ -16,7 +16,7 @@ RUN /env/bin/python -m pip cache purge || true
 
 # Set all conda environment variables (mimics conda activate)
 ENV PATH="/env/bin:$PATH"
-ENV LD_LIBRARY_PATH="/env/lib:$LD_LIBRARY_PATH"
+#ENV LD_LIBRARY_PATH="/env/lib:$LD_LIBRARY_PATH"
 ENV CONDA_PREFIX="/env"
 ENV CONDA_DEFAULT_ENV="cadet-api"
 
