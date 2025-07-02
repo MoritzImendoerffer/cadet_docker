@@ -1,0 +1,3 @@
+[submodule "cadet_api"]
+	path = cadet_api
+	url = git@github.com:MoritzImendoerffer/cadet_docker.git
