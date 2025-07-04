@@ -14,7 +14,7 @@ class SimulateRequest(BaseModel):
 
 
 @app.get("/get_status")
-def get_public_key():
+def get_status():
     return {"status": "ok"}
 
 
@@ -27,8 +27,11 @@ def simulate(req: SimulateRequest):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Deserialization failed: {exc}")
 
-    results = Cadet().simulate(process)
-
+    try:
+        results = Cadet().simulate(process)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Deserialization failed: {exc}")
+    
     pickled = dumps(results)
     return {
         "results_serialized": base64.b64encode(pickled).decode(),
