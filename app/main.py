@@ -16,9 +16,8 @@ app = FastAPI()
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(hostname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
 # Add hostname to all log messages
 class HostnameFilter(logging.Filter):
     hostname = socket.gethostname()
