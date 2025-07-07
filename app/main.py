@@ -20,7 +20,6 @@ def get_status():
 
 @app.post("/simulate")
 def simulate(req: SimulateRequest):
-    payload_bytes = base64.b64decode(req.process_serialized)
 
     try:
         process = loads_b64(req.process_serialized)
