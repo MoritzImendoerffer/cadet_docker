@@ -20,15 +20,18 @@ def get_public_key():
 
 @app.post("/simulate")
 def simulate(req: SimulateRequest):
-    payload_bytes = base64.b64decode(req.process_serialized)
+    #payload_bytes = base64.b64decode(req.process_serialized)
 
     try:
         process = loads_b64(req.process_serialized)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Deserialization failed: {exc}")
 
-    results = Cadet().simulate(process)
-
+    try:
+        results = Cadet().simulate(process)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Simulation failed: {exc}")
+    
     pickled = dumps(results)
     return {
         "results_serialized": base64.b64encode(pickled).decode(),
