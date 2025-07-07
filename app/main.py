@@ -14,13 +14,16 @@ class SimulateRequest(BaseModel):
 
 
 @app.get("/get_status")
-def get_public_key():
+def get_status():
     return {"status": "ok"}
 
 
 @app.post("/simulate")
 def simulate(req: SimulateRequest):
+<<<<<<< HEAD
     #payload_bytes = base64.b64decode(req.process_serialized)
+=======
+>>>>>>> main
 
     try:
         process = loads_b64(req.process_serialized)
@@ -30,7 +33,7 @@ def simulate(req: SimulateRequest):
     try:
         results = Cadet().simulate(process)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Simulation failed: {exc}")
+        raise HTTPException(status_code=400, detail=f"Deserialization failed: {exc}")
     
     pickled = dumps(results)
     return {
