@@ -40,7 +40,7 @@ def get_status():
 
 @app.post("/simulate")
 def simulate(req: SimulateRequest):
-    
+
     logger.info(f"Started simulation request at {datetime.datetime.now()}")
     started = time.time()
     try:
