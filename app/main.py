@@ -8,6 +8,7 @@ from CADETProcess.simulator import Cadet
 import socket
 import logging
 import time
+import datetime
 
 app = FastAPI()
 
@@ -40,7 +41,7 @@ def get_status():
 @app.post("/simulate")
 def simulate(req: SimulateRequest):
     
-    logger.info("Started simulation request")
+    logger.info(f"Started simulation request at {datetime.datetime.now()}")
     started = time.time()
     try:
         process = loads_b64(req.process_serialized)
