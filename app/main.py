@@ -84,7 +84,10 @@ async def health_check(response: Response):
     else:
         return {"healthy": True, "ready": True}
 
-@app.post("/simulate")
+@app.post("/simulate", 
+          summary="Run CADET simulation",
+          description="Execute a CADET process simulation with optional timeout control.",
+          response_description="The simulation results, serialized with dill and base64-encoded")
 async def simulate(req: SimulateRequest):
     logger.info(f"Started simulation request at {datetime.datetime.now()}")
     
